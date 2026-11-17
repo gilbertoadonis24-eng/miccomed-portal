@@ -38,6 +38,7 @@ export function AppChrome({
           {isInternal && (
             <>
               <Link href="/admin">Admin</Link>
+              <Link href="/admin/inteligencia">Inteligencia</Link>
               <Link href="/admin/clientes">Clientes</Link>
               <Link href="/admin/catalogo">Catálogo</Link>
               <Link href="/admin/precios">Precios/ULC</Link>

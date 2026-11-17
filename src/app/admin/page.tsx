@@ -17,6 +17,7 @@ export default async function AdminHome() {
         </p>
         <div className="grid">
           {[
+            ["/admin/inteligencia", "Inteligencia comercial"],
             ["/admin/clientes", "Clientes"],
             ["/admin/catalogo", "SKUs"],
             ["/admin/precios", "ULC / tiers"],

@@ -55,12 +55,31 @@ export async function resolveSession(request: Request): Promise<SessionUser | Re
     );
   }
 
-  const users = await sql<AppUserRow>(
+  let users = await sql<AppUserRow>(
     `select id, email, display_name, role, customer_id, active
      from app_user where lower(email) = $1 limit 1`,
     [email],
   );
-  const user = users[0];
+  let user = users[0];
+
+  // Sin admins activos (p. ej. prod tras quitar seed DEMO): el primer visor
+  // Cursor verificado (persona) se provisiona como INTERNAL_ADMIN.
+  if (!user || !user.active) {
+    const bootstrapped = await bootstrapOwnerAdmin({
+      email,
+      displayName: identity.name?.trim() || email,
+      existing: user ?? null,
+    });
+    if (bootstrapped) {
+      users = await sql<AppUserRow>(
+        `select id, email, display_name, role, customer_id, active
+         from app_user where lower(email) = $1 limit 1`,
+        [email],
+      );
+      user = users[0];
+    }
+  }
+
   if (!user || !user.active) {
     return Response.json(
       {
@@ -82,15 +101,7 @@ export async function resolveSession(request: Request): Promise<SessionUser | Re
 
   let permissions: StaffPermission[] = [];
   if (user.role === "INTERNAL_ADMIN") {
-    permissions = [
-      "view_cost",
-      "override_margin",
-      "send_quote",
-      "confirm_order",
-      "ship",
-      "issue_invoice",
-      "post_payment",
-    ];
+    permissions = staffPermissionsForAdmin();
   } else if (user.role === "INTERNAL_STAFF") {
     const rows = await sql<{ permission: StaffPermission }>(
       `select permission from staff_permission where user_id = $1`,
@@ -137,6 +148,19 @@ export function requirePermission(
   return null;
 }
 
+/** Maestros mutables (ULC write, lot create, etc.): solo INTERNAL_ADMIN. */
+export function requireAdmin(session: SessionUser): Response | null {
+  const denied = requireInternal(session);
+  if (denied) return denied;
+  if (session.role !== "INTERNAL_ADMIN") {
+    return Response.json(
+      { error: "forbidden", reason: "admin_required" },
+      { status: 403, headers: { "cache-control": "private, no-store" } },
+    );
+  }
+  return null;
+}
+
 export function requireClient(session: SessionUser): Response | null {
   if (session.plane !== "client" || !session.customerId) {
     return Response.json(
@@ -173,4 +197,61 @@ export async function audit(
      values ($1, $2, $3, $4, $5)`,
     [actorUserId, action, objectType, objectId ?? null, reason ?? null],
   );
+}
+
+const ALL_STAFF_PERMS: StaffPermission[] = [
+  "view_cost",
+  "override_margin",
+  "send_quote",
+  "confirm_order",
+  "ship",
+  "issue_invoice",
+  "post_payment",
+];
+
+/**
+ * Si no hay ningún INTERNAL_ADMIN activo, crea o reactiva este email como admin.
+ * No toca filas DEMO ajenas; solo el email del visor verificado.
+ */
+export async function bootstrapOwnerAdmin(input: {
+  email: string;
+  displayName: string;
+  existing: AppUserRow | null;
+}): Promise<boolean> {
+  const activeAdmins = await sql<{ id: string }>(
+    `select id from app_user
+     where role = 'INTERNAL_ADMIN' and active = true
+     limit 1`,
+  );
+  if (activeAdmins[0]) return false;
+
+  const email = input.email.trim().toLowerCase();
+  if (input.existing) {
+    await sql(
+      `update app_user
+       set active = true,
+           role = 'INTERNAL_ADMIN',
+           customer_id = null,
+           display_name = $2
+       where id = $1`,
+      [input.existing.id, input.displayName],
+    );
+    await audit(input.existing.id, "bootstrap_owner_admin", "app_user", input.existing.id);
+    return true;
+  }
+
+  const inserted = await sql<{ id: string }>(
+    `insert into app_user (email, display_name, role, customer_id, active)
+     values ($1, $2, 'INTERNAL_ADMIN', null, true)
+     returning id`,
+    [email, input.displayName],
+  );
+  const id = inserted[0]?.id;
+  if (!id) return false;
+  await audit(id, "bootstrap_owner_admin", "app_user", id);
+  return true;
+}
+
+export function staffPermissionsForAdmin(): StaffPermission[] {
+  return [...ALL_STAFF_PERMS];
 }

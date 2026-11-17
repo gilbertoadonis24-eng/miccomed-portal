@@ -1,4 +1,4 @@
-import { resolveSession, requirePermission } from "@/lib/auth";
+import { resolveSession, requirePermission, requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { json } from "@/lib/http";
 import { z } from "zod";
@@ -38,10 +38,11 @@ const ulcSchema = z.object({
 export async function POST(request: Request) {
   const session = await resolveSession(request);
   if (session instanceof Response) return session;
-  const denied = requirePermission(session, "view_cost");
-  if (denied) return denied;
   const body = await request.json();
   if (body?.action === "upsert_ulc") {
+    // Escritura de ULC es maestro: no basta view_cost (solo lectura).
+    const denied = requireAdmin(session);
+    if (denied) return denied;
     const parsed = ulcSchema.safeParse(body);
     if (!parsed.success) return json({ error: "invalid_body" }, 400);
     const rows = await sql(

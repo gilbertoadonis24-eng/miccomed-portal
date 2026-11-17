@@ -1,4 +1,4 @@
-import { resolveSession, requireInternal } from "@/lib/auth";
+import { resolveSession, requireInternal, requireAdmin } from "@/lib/auth";
 import { sql } from "@/lib/db";
 import { json } from "@/lib/http";
 import { z } from "zod";
@@ -43,7 +43,7 @@ const createSchema = z.object({
 export async function POST(request: Request) {
   const session = await resolveSession(request);
   if (session instanceof Response) return session;
-  const denied = requireInternal(session);
+  const denied = requireAdmin(session);
   if (denied) return denied;
   const parsed = createSchema.safeParse(await request.json());
   if (!parsed.success) return json({ error: "invalid_body" }, 400);

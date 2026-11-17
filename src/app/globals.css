@@ -87,7 +87,12 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
 }
 
 /* —— Inteligencia comercial —— */
-.intel { animation: intel-fade 0.45s ease both; }
+.intel { animation: intel-fade 0.45s ease; }
+@media (prefers-reduced-motion: reduce) {
+  .intel,
+  .intel-section,
+  .intel-hero__glow { animation: none !important; }
+}
 .intel-hero {
   position: relative;
   overflow: hidden;
@@ -245,8 +250,8 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
   50% { transform: translateY(12px) scale(1.08); opacity: 1; }
 }
 @keyframes intel-fade {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: none; }
+  from { transform: translateY(6px); }
+  to { transform: none; }
 }
 @media (max-width: 720px) {
   .intel-hero h1 { font-size: 2rem; }

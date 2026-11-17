@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { buildIntelDashboard } from "../src/lib/intel/build";
+import { aggregateByMonth, buildIntelDashboard } from "../src/lib/intel/build";
 import {
   buildReplenishmentAlerts,
   evaluateCover,
   MAX_COVER_MONTHS_BEFORE_REPLENISH,
   MIN_DEMAND_HISTORY_MONTHS,
 } from "../src/lib/intel/replenishment";
-import { intelInventory } from "../src/lib/intel/seed";
+import { intelInventory, intelPurchases, intelSales } from "../src/lib/intel/seed";
 
 describe("evaluateCover / reposición", () => {
   it("no sugiere sin ≥6 meses de historia aunque el stock esté bajo", () => {
@@ -25,6 +25,24 @@ describe("evaluateCover / reposición", () => {
     expect(m.monthsOfCover).toBeLessThanOrEqual(MAX_COVER_MONTHS_BEFORE_REPLENISH);
     expect(m.needsReplenishment).toBe(true);
     expect(m.suggestedQty).toBe(50); // 300 - 250
+  });
+
+  it("alerta en cobertura exactamente 3m aunque suggestedQty sea 0", () => {
+    const demand = [100, 100, 100, 100, 100, 100];
+    const onHand = 300; // cover === 3.0
+    const m = evaluateCover(onHand, demand);
+    expect(m.monthsOfCover).toBe(3);
+    expect(m.needsReplenishment).toBe(true);
+    expect(m.suggestedQty).toBe(0);
+  });
+
+  it("no alerta con demanda cero aunque haya ≥6m de historia", () => {
+    const m = evaluateCover(10, [0, 0, 0, 0, 0, 0]);
+    expect(m.eligible).toBe(true);
+    expect(m.avgMonthlyDemand).toBe(0);
+    expect(m.monthsOfCover).toBeNull();
+    expect(m.needsReplenishment).toBe(false);
+    expect(m.suggestedQty).toBe(0);
   });
 
   it("no sugiere con cobertura >3m aunque haya historia", () => {
@@ -63,5 +81,32 @@ describe("seed DEMO inteligencia", () => {
     expect(snap.clients.some((c) => c.status === "inactivo")).toBe(true);
     expect(snap.replenishment.length).toBeGreaterThan(0);
     expect(snap.overview.replenishmentAlerts).toBe(snap.replenishment.length);
+  });
+
+  it("series mensuales / YTD cuadran con suma de facturas y POs", () => {
+    const snap = buildIntelDashboard();
+    const salesSum = intelSales.reduce((a, s) => a + s.total, 0);
+    const purchaseSum = intelPurchases.reduce((a, p) => a + p.total, 0);
+    const salesSeries = snap.salesByMonth.reduce((a, p) => a + p.amount, 0);
+    const purchaseSeries = snap.purchasesByMonth.reduce((a, p) => a + p.amount, 0);
+
+    expect(salesSeries).toBe(salesSum);
+    expect(purchaseSeries).toBe(purchaseSum);
+    expect(snap.overview.salesYtd).toBe(salesSum);
+    expect(snap.overview.salesMtd).toBe(
+      intelSales
+        .filter((s) => s.invoiceDate.startsWith("2025-11"))
+        .reduce((a, s) => a + s.total, 0),
+    );
+    expect(snap.overview.purchaseMtd).toBe(
+      intelPurchases
+        .filter((p) => p.poDate.startsWith("2025-11"))
+        .reduce((a, p) => a + p.total, 0),
+    );
+
+    // aggregateByMonth es la misma derivación usada por el snapshot
+    expect(aggregateByMonth(intelSales.map((s) => ({ date: s.invoiceDate, amount: s.total })))).toEqual(
+      snap.salesByMonth,
+    );
   });
 });

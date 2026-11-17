@@ -1,4 +1,4 @@
-export { buildIntelDashboard } from "./build";
+export { aggregateByMonth, buildIntelDashboard } from "./build";
 export {
   buildReplenishmentAlerts,
   evaluateCover,

@@ -8,7 +8,6 @@ import type {
   ExpenseRow,
   InventorySku,
   MarketSignal,
-  MonthlyPoint,
   PayrollRow,
   PriceOpportunity,
   PurchaseRow,
@@ -244,24 +243,6 @@ export const intelSales: SalesRow[] = [
     ulc: 42,
     total: 340,
   },
-];
-
-export const intelPurchasesByMonth: MonthlyPoint[] = [
-  { month: "2025-06", amount: 9200 },
-  { month: "2025-07", amount: 11400 },
-  { month: "2025-08", amount: 10850 },
-  { month: "2025-09", amount: 13200 },
-  { month: "2025-10", amount: 22520 },
-  { month: "2025-11", amount: 9200 },
-];
-
-export const intelSalesByMonth: MonthlyPoint[] = [
-  { month: "2025-06", amount: 14200 },
-  { month: "2025-07", amount: 15880 },
-  { month: "2025-08", amount: 15110 },
-  { month: "2025-09", amount: 17640 },
-  { month: "2025-10", amount: 18950 },
-  { month: "2025-11", amount: 10485 },
 ];
 
 export const intelExpenses: ExpenseRow[] = [

@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import type {
   IntelDashboardSnapshot,
@@ -46,7 +47,15 @@ export function IntelDashboardClient({
   data: IntelDashboardSnapshot;
   initialSection?: IntelSectionId;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [section, setSection] = useState<IntelSectionId>(initialSection);
+
+  function goToSection(id: IntelSectionId) {
+    setSection(id);
+    const qs = id === "overview" ? "" : `?seccion=${id}`;
+    router.replace(`${pathname}${qs}`, { scroll: false });
+  }
 
   return (
     <div className="intel">
@@ -78,7 +87,7 @@ export function IntelDashboardClient({
             key={s.id}
             type="button"
             className={section === s.id ? "intel-tab intel-tab--active" : "intel-tab"}
-            onClick={() => setSection(s.id)}
+            onClick={() => goToSection(s.id)}
           >
             {s.label}
             {s.id === "reposicion" && data.overview.replenishmentAlerts > 0 ? (
@@ -88,7 +97,7 @@ export function IntelDashboardClient({
         ))}
       </nav>
 
-      {section === "overview" && <Overview data={data} onJump={setSection} />}
+      {section === "overview" && <Overview data={data} onJump={goToSection} />}
       {section === "markets" && <Markets data={data} />}
       {section === "compras" && <Compras data={data} />}
       {section === "ventas" && <Ventas data={data} />}

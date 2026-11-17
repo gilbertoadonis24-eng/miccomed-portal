@@ -12,23 +12,29 @@ import {
   intelOpportunities,
   intelPayroll,
   intelPurchases,
-  intelPurchasesByMonth,
   intelSales,
-  intelSalesByMonth,
 } from "./seed";
 import type {
   IntelDashboardSnapshot,
   InventoryTurnRow,
+  MonthlyPoint,
 } from "./types";
 
 const CURRENT_MONTH = "2025-11";
 
 export function buildIntelDashboard(): IntelDashboardSnapshot {
+  const salesByMonth = aggregateByMonth(
+    intelSales.map((s) => ({ date: s.invoiceDate, amount: s.total })),
+  );
+  const purchasesByMonth = aggregateByMonth(
+    intelPurchases.map((p) => ({ date: p.poDate, amount: p.total })),
+  );
+
   const salesMtd = sumBy(
     intelSales.filter((s) => s.invoiceDate.startsWith(CURRENT_MONTH)),
     (s) => s.total,
   );
-  const salesYtd = sumBy(intelSalesByMonth, (p) => p.amount);
+  const salesYtd = sumBy(salesByMonth, (p) => p.amount);
   const purchaseMtd = sumBy(
     intelPurchases.filter((p) => p.poDate.startsWith(CURRENT_MONTH)),
     (p) => p.total,
@@ -81,9 +87,9 @@ export function buildIntelDashboard(): IntelDashboardSnapshot {
     competitors: intelCompetitors,
     opportunities: intelOpportunities,
     purchases: intelPurchases,
-    purchasesByMonth: intelPurchasesByMonth,
+    purchasesByMonth,
     sales: intelSales,
-    salesByMonth: intelSalesByMonth,
+    salesByMonth,
     marginBySku,
     expenses: intelExpenses,
     payroll: intelPayroll,
@@ -92,6 +98,21 @@ export function buildIntelDashboard(): IntelDashboardSnapshot {
     replenishment,
     inventoryWatch: intelInventory,
   };
+}
+
+/** Agrupa montos por YYYY-MM a partir de filas (facturas/PO) — fuente única de verdad. */
+export function aggregateByMonth(
+  rows: { date: string; amount: number }[],
+): MonthlyPoint[] {
+  const map = new Map<string, number>();
+  for (const row of rows) {
+    const month = row.date.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(month)) continue;
+    map.set(month, (map.get(month) ?? 0) + row.amount);
+  }
+  return [...map.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, amount]) => ({ month, amount }));
 }
 
 function buildMarginBySku() {

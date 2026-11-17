@@ -19,9 +19,10 @@ export type CoverMetrics = {
 };
 
 /**
- * Regla MiccoMed V1:
- * si hay ≥6 meses de demanda histórica y la cobertura on-hand es ≤3 meses,
- * sugerir reposición = max(0, demanda_promedio×3 − on_hand).
+ * Regla MiccoMed V1 (corrección de producto):
+ * si hay ≥6 meses de demanda histórica y la cobertura on-hand es ≤3 meses
+ * (incluye exactamente 3.0), alertar. suggestedQty puede ser 0 en el borde
+ * exacto (target − onHand ≤ 0) y **sigue siendo alerta** — no se suprime.
  */
 export function evaluateCover(
   onHand: number,
@@ -33,11 +34,12 @@ export function evaluateCover(
   const avgMonthlyDemand =
     monthsOfHistory > 0 ? sum / monthsOfHistory : 0;
 
+  // Demanda cero / negativa: no hay tasa usable → sin alerta.
   if (!eligible || avgMonthlyDemand <= 0) {
     return {
       monthsOfHistory,
       avgMonthlyDemand,
-      monthsOfCover: avgMonthlyDemand > 0 ? onHand / avgMonthlyDemand : null,
+      monthsOfCover: null,
       eligible,
       needsReplenishment: false,
       suggestedQty: 0,
@@ -47,6 +49,7 @@ export function evaluateCover(
   const monthsOfCover = onHand / avgMonthlyDemand;
   const needsReplenishment = monthsOfCover <= MAX_COVER_MONTHS_BEFORE_REPLENISH;
   const target = avgMonthlyDemand * REPLENISH_TARGET_COVER_MONTHS;
+  // En cover === 3, ceil(target − onHand) puede ser 0; la alerta permanece.
   const suggestedQty = needsReplenishment
     ? Math.max(0, Math.ceil(target - onHand))
     : 0;

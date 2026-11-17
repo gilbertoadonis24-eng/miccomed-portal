@@ -18,8 +18,10 @@ export default async function HomePage() {
         </p>
         {!session && (
           <p className="danger">
-            No hay usuario mapeado para el visor Cursor. En local el visor simulado debe coincidir
-            con un email de <code>app_user</code> (p. ej. admin@miccomed.demo).
+            No hay sesión de portal para este visor Cursor. El primer acceso verificado provisiona un
+            INTERNAL_ADMIN automáticamente si aún no hay admins activos; si ya hay admins, el email
+            debe estar invitado en <code>app_user</code>. En local usa el seed DEMO (p. ej.{" "}
+            <code>admin@miccomed.demo</code>).
           </p>
         )}
         {session?.plane === "internal" && (

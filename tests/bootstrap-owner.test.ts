@@ -14,6 +14,12 @@ describe("bootstrapOwnerAdmin (allowlist)", () => {
     await resetLocalDbForTests();
   });
 
+  it("reconoce allowlist de cursor-app.json sin secret", () => {
+    delete process.env.BOOTSTRAP_ADMIN_EMAIL;
+    expect(isBootstrapAdminEmail("gilbertoadonis24@gmail.com")).toBe(true);
+    expect(isBootstrapAdminEmail("intruso@example.com")).toBe(false);
+  });
+
   it("no promueve a un visor arbitrario aunque no haya admins", async () => {
     await sql(`update app_user set active = false where role = 'INTERNAL_ADMIN'`);
     delete process.env.BOOTSTRAP_ADMIN_EMAIL;

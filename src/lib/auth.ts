@@ -63,7 +63,7 @@ export async function resolveSession(request: Request): Promise<SessionUser | Re
   );
   let user = users[0];
 
-  // Sin admins activos: solo emails en BOOTSTRAP_ADMIN_EMAIL / cursor-app allowlist.
+  // Sin admins activos: solo emails en secret BOOTSTRAP_ADMIN_EMAIL.
   if (!user || !user.active) {
     const bootstrapped = await bootstrapOwnerAdmin({
       email,
@@ -81,15 +81,10 @@ export async function resolveSession(request: Request): Promise<SessionUser | Re
   }
 
   if (!user || !user.active) {
-    const noActiveAdmin = await hasNoActiveAdmin();
-    const hint = noActiveAdmin
-      ? "Pide al owner configurar BOOTSTRAP_ADMIN_EMAIL (secret) o bootstrapAdminEmails en cursor-app.json."
-      : "El visor Cursor debe estar invitado en app_user (email).";
     return Response.json(
       {
         error: "forbidden",
-        reason: noActiveAdmin ? "bootstrap_admin_required" : "user_not_provisioned",
-        hint,
+        reason: "user_not_provisioned",
         email,
       },
       { status: 403, headers: { "cache-control": "private, no-store" } },
@@ -223,8 +218,8 @@ async function hasNoActiveAdmin(): Promise<boolean> {
 }
 
 /**
- * Solo si no hay INTERNAL_ADMIN activo Y el email está en la allowlist
- * (`BOOTSTRAP_ADMIN_EMAIL` y/o `cursor-app.json` → bootstrapAdminEmails).
+ * Solo si no hay INTERNAL_ADMIN activo Y el email está en
+ * `BOOTSTRAP_ADMIN_EMAIL` (secret/env; nunca allowlist en archivos shippeados).
  */
 export async function bootstrapOwnerAdmin(input: {
   email: string;

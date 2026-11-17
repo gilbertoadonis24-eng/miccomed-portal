@@ -2,8 +2,10 @@ import { readdir, readFile } from "node:fs/promises";
 import pg from "pg";
 
 const url = process.env.DATABASE_URL?.trim() ?? "";
+// Solo schema / data migrations de prod. El seed DEMO vive en seeds/ (PGlite/local).
 const files = (await readdir("migrations").catch(() => []))
   .filter((f) => f.endsWith(".sql"))
+  .filter((f) => !/seed/i.test(f))
   .sort();
 if (url === "" || files.length === 0) {
   console.log("migrate: nothing to do");

@@ -85,3 +85,170 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
   .topbar { flex-direction: column; align-items: flex-start; }
   .brand { font-size: 1.35rem; }
 }
+
+/* —— Inteligencia comercial —— */
+.intel { animation: intel-fade 0.45s ease both; }
+.intel-hero {
+  position: relative;
+  overflow: hidden;
+  padding: 1.4rem 1.3rem 1.2rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background:
+    linear-gradient(135deg, rgba(36, 85, 68, 0.55), rgba(26, 58, 48, 0.35)),
+    repeating-linear-gradient(
+      -18deg,
+      transparent,
+      transparent 11px,
+      rgba(212, 160, 23, 0.035) 11px,
+      rgba(212, 160, 23, 0.035) 12px
+    );
+}
+.intel-hero__glow {
+  position: absolute;
+  inset: -40% auto auto 55%;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(62, 207, 142, 0.22), transparent 70%);
+  animation: intel-pulse 5.5s ease-in-out infinite;
+  pointer-events: none;
+}
+.intel-kicker {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.intel-hero h1 {
+  font-size: clamp(2.2rem, 5vw, 3.1rem);
+  margin-bottom: 0.45rem;
+  letter-spacing: 0.01em;
+}
+.intel-hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.intel-stub-hint { margin: 0.65rem 0 0; font-size: 0.85rem; }
+.intel-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 1rem;
+}
+.intel-tab {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: rgba(12, 23, 19, 0.45);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+.intel-tab:hover { color: var(--ink); border-color: rgba(212, 160, 23, 0.45); }
+.intel-tab--active {
+  color: #1a1405;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.intel-tab__count {
+  display: inline-block;
+  margin-left: 0.35rem;
+  min-width: 1.2rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+.intel-tab--active .intel-tab__count {
+  background: #1a1405;
+  color: var(--accent);
+}
+.intel-section {
+  background: rgba(26, 58, 48, 0.72);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1rem;
+  animation: intel-fade 0.35s ease;
+}
+.intel-section h3 { margin-top: 1.1rem; }
+.intel-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+.intel-kpi {
+  padding: 0.85rem 0.9rem;
+  border-left: 3px solid var(--accent);
+  background: rgba(12, 23, 19, 0.4);
+  border-radius: 0 12px 12px 0;
+}
+.intel-kpi--ok { border-left-color: var(--accent-2); }
+.intel-kpi--warn { border-left-color: var(--danger); }
+.intel-kpi__label {
+  font-size: 0.78rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.intel-kpi__value {
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  margin-top: 0.2rem;
+}
+.intel-jump { display: flex; flex-wrap: wrap; gap: 0.6rem; }
+.intel-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.55rem;
+  height: 110px;
+  margin: 0.85rem 0 1.1rem;
+  padding: 0.5rem 0.25rem 0;
+}
+.intel-bar {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+  gap: 0.3rem;
+}
+.intel-bar__fill {
+  width: 100%;
+  max-width: 42px;
+  border-radius: 8px 8px 3px 3px;
+  background: linear-gradient(180deg, #3ecf8e, #245544);
+  min-height: 4px;
+  transition: height 0.45s ease;
+}
+.intel-bar__fill--accent {
+  background: linear-gradient(180deg, #e2b84a, #8a6410);
+}
+.intel-bar__label { font-size: 0.72rem; color: var(--muted); }
+@keyframes intel-pulse {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0.85; }
+  50% { transform: translateY(12px) scale(1.08); opacity: 1; }
+}
+@keyframes intel-fade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@media (max-width: 720px) {
+  .intel-hero h1 { font-size: 2rem; }
+  .intel-kpi__value { font-size: 1.25rem; }
+}

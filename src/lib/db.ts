@@ -60,15 +60,26 @@ export async function withTransaction<T>(
   }
 }
 
+async function execSqlFiles(db: PGlite, dir: string, files: string[]): Promise<void> {
+  for (const file of files) {
+    await db.exec(await readFile(path.join(dir, file), "utf8"));
+  }
+}
+
 async function startLocal(): Promise<PGlite> {
   const db = new PGlite();
-  const files = (await readdir(migrationsDir()).catch(() => []))
+  const migDir = migrationsDir();
+  // Solo schema/cleanup en migrations/ (nunca seeds DEMO de prod).
+  const migrations = (await readdir(migDir).catch(() => []))
+    .filter((f) => f.endsWith(".sql") && !/seed/i.test(f))
+    .sort();
+  await execSqlFiles(db, migDir, migrations);
+  // DEMO seed solo en PGlite/local — no corre en scripts/migrate.mjs con DATABASE_URL.
+  const seedDir = path.join(process.cwd(), "seeds");
+  const seeds = (await readdir(seedDir).catch(() => []))
     .filter((f) => f.endsWith(".sql"))
     .sort();
-  for (const file of files) {
-    const body = await readFile(path.join(migrationsDir(), file), "utf8");
-    await db.exec(body);
-  }
+  await execSqlFiles(db, seedDir, seeds);
   return db;
 }
 

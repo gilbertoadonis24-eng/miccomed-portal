@@ -1,5 +1,6 @@
 -- DEMO seed — claramente marcado is_demo=true. Datos ficticios para demos y tests de no-fuga.
 -- No son precios ni clientes reales de MiccoMed.
+-- Solo se carga en PGlite/local (src/lib/db.ts). NO corre en scripts/migrate.mjs con DATABASE_URL.
 
 insert into category (id, slug, name_es) values
   ('11111111-1111-1111-1111-111111111001', 'devices', 'Dispositivos'),

@@ -18,10 +18,8 @@ export default async function HomePage() {
         </p>
         {!session && (
           <p className="danger">
-            No hay sesión de portal para este visor Cursor. El email debe coincidir con la allowlist
-            de bootstrap (<code>bootstrapAdminEmails</code> / <code>BOOTSTRAP_ADMIN_EMAIL</code>) si
-            aún no hay admins, o estar invitado en <code>app_user</code>. En local usa el seed DEMO
-            (p. ej. <code>admin@miccomed.demo</code>).
+            No hay sesión de portal para este visor. Debe estar invitado como usuario del portal.
+            En desarrollo local usa el seed DEMO.
           </p>
         )}
         {session?.plane === "internal" && (

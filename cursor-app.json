@@ -1,6 +1,3 @@
 {
-  "database": "postgres",
-  "bootstrapAdminEmails": [
-    "gilbertoadonis24@gmail.com"
-  ]
+  "database": "postgres"
 }

@@ -58,8 +58,11 @@ export async function POST(request: Request) {
   }
 
   if (parsed.data.action === "ship") {
-    const perm = requirePermission(session, "ship");
-    if (perm) return perm;
+    // shipOrder emite factura al embarque → exige ship + issue_invoice.
+    const shipPerm = requirePermission(session, "ship");
+    if (shipPerm) return shipPerm;
+    const invoicePerm = requirePermission(session, "issue_invoice");
+    if (invoicePerm) return invoicePerm;
     if (!parsed.data.receiverName) return json({ error: "receiver_required" }, 400);
     const result = await shipOrder({
       orderId: parsed.data.orderId,

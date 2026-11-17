@@ -14,9 +14,9 @@ describe("bootstrapOwnerAdmin (allowlist)", () => {
     await resetLocalDbForTests();
   });
 
-  it("reconoce allowlist de cursor-app.json sin secret", () => {
+  it("sin secret no reconoce ningún email (ni allowlist en archivos)", () => {
     delete process.env.BOOTSTRAP_ADMIN_EMAIL;
-    expect(isBootstrapAdminEmail("gilbertoadonis24@gmail.com")).toBe(true);
+    expect(isBootstrapAdminEmail("gilbertoadonis24@gmail.com")).toBe(false);
     expect(isBootstrapAdminEmail("intruso@example.com")).toBe(false);
   });
 

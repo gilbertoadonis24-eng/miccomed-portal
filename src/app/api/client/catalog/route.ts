@@ -16,6 +16,10 @@ export async function GET(request: Request) {
   const customerId = session.customerId!;
   const url = new URL(request.url);
   const q = url.searchParams.get("q")?.trim() ?? "";
+  const rawLimit = Number(url.searchParams.get("limit") ?? "50");
+  const rawOffset = Number(url.searchParams.get("offset") ?? "0");
+  const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 100) : 50;
+  const offset = Number.isFinite(rawOffset) ? Math.max(Math.trunc(rawOffset), 0) : 0;
 
   const skus = await sql<{
     id: string;
@@ -37,8 +41,9 @@ export async function GET(request: Request) {
      left join sku_regulatory r on r.sku_id = s.id
      where s.active = true
        and ($1 = '' or s.sku_code ilike '%' || $1 || '%' or s.title ilike '%' || $1 || '%')
-     order by s.sku_code`,
-    [q],
+     order by s.sku_code
+     limit $2 offset $3`,
+    [q, limit, offset],
   );
 
   const items = [];
@@ -81,5 +86,10 @@ export async function GET(request: Request) {
   }
 
   assertNoCostLeak(items, "client.catalog");
-  return json({ items, demo_banner: "Datos DEMO — no son precios reales MiccoMed" });
+  return json({
+    items,
+    limit,
+    offset,
+    demo_banner: "Datos DEMO — no son precios reales MiccoMed",
+  });
 }

@@ -137,6 +137,19 @@ export function requirePermission(
   return null;
 }
 
+/** Maestros mutables (ULC write, lot create, etc.): solo INTERNAL_ADMIN. */
+export function requireAdmin(session: SessionUser): Response | null {
+  const denied = requireInternal(session);
+  if (denied) return denied;
+  if (session.role !== "INTERNAL_ADMIN") {
+    return Response.json(
+      { error: "forbidden", reason: "admin_required" },
+      { status: 403, headers: { "cache-control": "private, no-store" } },
+    );
+  }
+  return null;
+}
+
 export function requireClient(session: SessionUser): Response | null {
   if (session.plane !== "client" || !session.customerId) {
     return Response.json(

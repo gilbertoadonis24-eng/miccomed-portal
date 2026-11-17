@@ -37,43 +37,45 @@ export default async function HomePage() {
           </p>
         )}
       </section>
-      <section className="panel">
-        <h2>Credenciales DEMO (seed)</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>Email (identidad Cursor)</th>
-              <th>Rol</th>
-              <th>Cuenta</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>admin@miccomed.demo / dev@example.com</td>
-              <td>INTERNAL_ADMIN</td>
-              <td>—</td>
-            </tr>
-            <tr>
-              <td>staff@miccomed.demo</td>
-              <td>INTERNAL_STAFF (todos los flags)</td>
-              <td>—</td>
-            </tr>
-            <tr>
-              <td>comprador@farmacia-norte.demo</td>
-              <td>CLIENT_USER</td>
-              <td>DEMO-NORTE</td>
-            </tr>
-            <tr>
-              <td>ap@clinica-sur.demo</td>
-              <td>CLIENT_USER</td>
-              <td>DEMO-SUR</td>
-            </tr>
-          </tbody>
-        </table>
-        <p className="muted">
-          Auth = gate Cursor Apps + mapeo por email. No hay login/password propio.
-        </p>
-      </section>
+      {session?.plane === "internal" && (
+        <section className="panel">
+          <h2>Credenciales DEMO (seed)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Email (identidad Cursor)</th>
+                <th>Rol</th>
+                <th>Cuenta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>admin@miccomed.demo / dev@example.com</td>
+                <td>INTERNAL_ADMIN</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>staff@miccomed.demo</td>
+                <td>INTERNAL_STAFF (todos los flags)</td>
+                <td>—</td>
+              </tr>
+              <tr>
+                <td>comprador@farmacia-norte.demo</td>
+                <td>CLIENT_USER</td>
+                <td>DEMO-NORTE</td>
+              </tr>
+              <tr>
+                <td>ap@clinica-sur.demo</td>
+                <td>CLIENT_USER</td>
+                <td>DEMO-SUR</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="muted">
+            Solo visible al plano interno. Auth = gate Cursor Apps + mapeo por email.
+          </p>
+        </section>
+      )}
     </AppChrome>
   );
 }

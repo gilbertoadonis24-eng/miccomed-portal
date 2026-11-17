@@ -139,7 +139,10 @@ export type InventoryTurnRow = {
 export type IntelDashboardSnapshot = {
   generatedAt: string;
   periodLabel: string;
-  isDemo: true;
+  isDemo: boolean;
+  /** True si al menos un dominio viene de un Excel cargado en sesión. */
+  loadedFromExcel: boolean;
+  loadedSourceKeys: string[];
   overview: IntelOverviewKpis;
   markets: MarketSignal[];
   competitors: CompetitorRow[];

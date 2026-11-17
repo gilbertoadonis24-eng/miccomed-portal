@@ -2,18 +2,11 @@ import {
   buildReplenishmentAlerts,
   evaluateCover,
 } from "./replenishment";
+import { INTEL_PERIOD_LABEL } from "./seed";
 import {
-  INTEL_PERIOD_LABEL,
-  intelClients,
-  intelCompetitors,
-  intelExpenses,
-  intelInventory,
-  intelMarkets,
-  intelOpportunities,
-  intelPayroll,
-  intelPurchases,
-  intelSales,
-} from "./seed";
+  mergeIntelSources,
+  type IntelSourceData,
+} from "./sources";
 import type {
   IntelDashboardSnapshot,
   InventoryTurnRow,
@@ -22,55 +15,67 @@ import type {
 
 const CURRENT_MONTH = "2025-11";
 
-export function buildIntelDashboard(): IntelDashboardSnapshot {
+export function buildIntelDashboard(
+  overrides: Partial<IntelSourceData> = {},
+): IntelDashboardSnapshot {
+  const src = mergeIntelSources(overrides);
+  const loadedKeys = (Object.keys(overrides) as (keyof IntelSourceData)[]).filter(
+    (k) => overrides[k] !== undefined,
+  );
+
   const salesByMonth = aggregateByMonth(
-    intelSales.map((s) => ({ date: s.invoiceDate, amount: s.total })),
+    src.sales.map((s) => ({ date: s.invoiceDate, amount: s.total })),
   );
   const purchasesByMonth = aggregateByMonth(
-    intelPurchases.map((p) => ({ date: p.poDate, amount: p.total })),
+    src.purchases.map((p) => ({ date: p.poDate, amount: p.total })),
   );
 
   const salesMtd = sumBy(
-    intelSales.filter((s) => s.invoiceDate.startsWith(CURRENT_MONTH)),
+    src.sales.filter((s) => s.invoiceDate.startsWith(CURRENT_MONTH)),
     (s) => s.total,
   );
   const salesYtd = sumBy(salesByMonth, (p) => p.amount);
   const purchaseMtd = sumBy(
-    intelPurchases.filter((p) => p.poDate.startsWith(CURRENT_MONTH)),
+    src.purchases.filter((p) => p.poDate.startsWith(CURRENT_MONTH)),
     (p) => p.total,
   );
 
-  const salesCogs = sumBy(intelSales, (s) => s.ulc * s.qty);
-  const salesRev = sumBy(intelSales, (s) => s.total);
+  const salesCogs = sumBy(src.sales, (s) => s.ulc * s.qty);
+  const salesRev = sumBy(src.sales, (s) => s.total);
   const grossMarginPct =
     salesRev > 0 ? ((salesRev - salesCogs) / salesRev) * 100 : 0;
 
   const expenseMtd = sumBy(
-    intelExpenses.filter((e) => e.month === CURRENT_MONTH),
+    src.expenses.filter((e) => e.month === CURRENT_MONTH),
     (e) => e.amount,
   );
   const payrollMtd = sumBy(
-    intelPayroll.filter((p) => p.month === CURRENT_MONTH),
+    src.payroll.filter((p) => p.month === CURRENT_MONTH),
     (p) => p.gross,
   );
 
-  const activeClients = intelClients.filter((c) => c.status === "activo").length;
-  const inactiveClients = intelClients.filter((c) => c.status === "inactivo").length;
+  const activeClients = src.clients.filter((c) => c.status === "activo").length;
+  const inactiveClients = src.clients.filter((c) => c.status === "inactivo").length;
 
-  const replenishment = buildReplenishmentAlerts(intelInventory);
+  const replenishment = buildReplenishmentAlerts(src.inventory);
 
-  const inventoryTurns = buildInventoryTurns();
+  const inventoryTurns = buildInventoryTurns(src.inventory);
   const inventoryTurnsAvg =
     inventoryTurns.length > 0
       ? inventoryTurns.reduce((a, r) => a + r.turns, 0) / inventoryTurns.length
       : 0;
 
-  const marginBySku = buildMarginBySku();
+  const marginBySku =
+    src.margins && src.margins.length > 0
+      ? [...src.margins].sort((a, b) => b.sales - a.sales)
+      : buildMarginBySku(src);
 
   return {
-    generatedAt: "2025-11-17T12:00:00.000Z",
+    generatedAt: new Date().toISOString(),
     periodLabel: INTEL_PERIOD_LABEL,
     isDemo: true,
+    loadedFromExcel: loadedKeys.length > 0,
+    loadedSourceKeys: loadedKeys.map(String),
     overview: {
       salesMtd,
       salesYtd,
@@ -83,20 +88,20 @@ export function buildIntelDashboard(): IntelDashboardSnapshot {
       replenishmentAlerts: replenishment.length,
       inventoryTurns: round1(inventoryTurnsAvg),
     },
-    markets: intelMarkets,
-    competitors: intelCompetitors,
-    opportunities: intelOpportunities,
-    purchases: intelPurchases,
+    markets: src.markets,
+    competitors: src.competitors,
+    opportunities: src.opportunities,
+    purchases: src.purchases,
     purchasesByMonth,
-    sales: intelSales,
+    sales: src.sales,
     salesByMonth,
     marginBySku,
-    expenses: intelExpenses,
-    payroll: intelPayroll,
+    expenses: src.expenses,
+    payroll: src.payroll,
     inventoryTurns,
-    clients: intelClients,
+    clients: src.clients,
     replenishment,
-    inventoryWatch: intelInventory,
+    inventoryWatch: src.inventory,
   };
 }
 
@@ -115,13 +120,13 @@ export function aggregateByMonth(
     .map(([month, amount]) => ({ month, amount }));
 }
 
-function buildMarginBySku() {
+function buildMarginBySku(src: IntelSourceData) {
   const map = new Map<
     string,
     { skuCode: string; title: string; sales: number; cogs: number }
   >();
-  for (const s of intelSales) {
-    const inv = intelInventory.find((i) => i.skuCode === s.skuCode);
+  for (const s of src.sales) {
+    const inv = src.inventory.find((i) => i.skuCode === s.skuCode);
     const cur = map.get(s.skuCode) ?? {
       skuCode: s.skuCode,
       title: inv?.title ?? s.skuCode,
@@ -142,8 +147,8 @@ function buildMarginBySku() {
     .sort((a, b) => b.sales - a.sales);
 }
 
-function buildInventoryTurns(): InventoryTurnRow[] {
-  return intelInventory.map((sku) => {
+function buildInventoryTurns(inventory: IntelSourceData["inventory"]): InventoryTurnRow[] {
+  return inventory.map((sku) => {
     const cover = evaluateCover(sku.onHand, sku.monthlyDemand);
     const avgDemand =
       sku.monthlyDemand.length > 0

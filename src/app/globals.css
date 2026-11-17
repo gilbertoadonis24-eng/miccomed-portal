@@ -140,6 +140,33 @@ label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 
   margin-top: 1rem;
 }
 .intel-stub-hint { margin: 0.65rem 0 0; font-size: 0.85rem; }
+.intel-banner {
+  margin: 0.85rem 0 0;
+  font-size: 0.9rem;
+  padding: 0.55rem 0.75rem;
+  border-left: 3px solid var(--accent-2);
+  background: rgba(12, 23, 19, 0.35);
+}
+.intel-excel-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  margin: 0.75rem 0 1rem;
+}
+.intel-excel-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.intel-excel-bar__actions label.btn {
+  cursor: pointer;
+  margin: 0;
+}
+.intel-excel-bar__err {
+  margin: 0.35rem 0 0;
+  font-size: 0.85rem;
+}
 .intel-tabs {
   display: flex;
   flex-wrap: wrap;

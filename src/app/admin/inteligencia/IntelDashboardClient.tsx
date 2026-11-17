@@ -1,11 +1,19 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { buildIntelDashboard } from "@/lib/intel/build";
+import {
+  EXCEL_DOMAINS,
+  type ExcelDomainId,
+} from "@/lib/intel/excel-domains";
+import { parseIntelExcel } from "@/lib/intel/excel";
+import type { IntelSourceData } from "@/lib/intel/sources";
 import type {
   IntelDashboardSnapshot,
   IntelSectionId,
 } from "@/lib/intel/types";
+import { ExcelSectionActions } from "./ExcelSectionActions";
 
 const SECTIONS: { id: IntelSectionId; label: string }[] = [
   { id: "overview", label: "Resumen" },
@@ -18,6 +26,18 @@ const SECTIONS: { id: IntelSectionId; label: string }[] = [
   { id: "clientes", label: "Clientes" },
   { id: "reposicion", label: "Reposición" },
 ];
+
+/** Dominios Excel asociados a cada sección (gastos tiene dos). */
+const SECTION_DOMAINS: Partial<Record<IntelSectionId, ExcelDomainId[]>> = {
+  markets: ["mercados"],
+  compras: ["compras"],
+  ventas: ["ventas"],
+  margenes: ["margenes"],
+  gastos: ["gastos", "nomina"],
+  rotacion: ["inventario"],
+  clientes: ["clientes"],
+  reposicion: ["demanda"],
+};
 
 function usd(n: number): string {
   return new Intl.NumberFormat("es-US", {
@@ -41,7 +61,7 @@ function pct(n: number): string {
 }
 
 export function IntelDashboardClient({
-  data,
+  data: initialData,
   initialSection = "overview",
 }: {
   data: IntelDashboardSnapshot;
@@ -50,11 +70,84 @@ export function IntelDashboardClient({
   const router = useRouter();
   const pathname = usePathname();
   const [section, setSection] = useState<IntelSectionId>(initialSection);
+  const [overrides, setOverrides] = useState<Partial<IntelSourceData>>({});
+  const [loadedDomains, setLoadedDomains] = useState<Partial<Record<ExcelDomainId, true>>>(
+    {},
+  );
+  const [busyDomain, setBusyDomain] = useState<ExcelDomainId | null>(null);
+  const [banner, setBanner] = useState<string | null>(null);
+
+  const data = useMemo(() => {
+    if (Object.keys(overrides).length === 0) return initialData;
+    return buildIntelDashboard(overrides);
+  }, [initialData, overrides]);
 
   function goToSection(id: IntelSectionId) {
     setSection(id);
     const qs = id === "overview" ? "" : `?seccion=${id}`;
     router.replace(`${pathname}${qs}`, { scroll: false });
+  }
+
+  async function handleLoad(domain: ExcelDomainId, file: File) {
+    setBusyDomain(domain);
+    setBanner(null);
+    try {
+      const buf = await file.arrayBuffer();
+      const result = parseIntelExcel(domain, buf);
+      if (!result.ok) {
+        setBanner(result.error);
+        return;
+      }
+      const { domain: _d, rowCounts, ...patch } = result.patch;
+      setOverrides((prev) => ({ ...prev, ...patch }));
+      setLoadedDomains((prev) => ({ ...prev, [domain]: true }));
+      const counts = Object.entries(rowCounts)
+        .map(([k, n]) => `${n} ${k}`)
+        .join(" · ");
+      setBanner(
+        `Cargado «${EXCEL_DOMAINS[domain].label}» desde ${file.name} (${counts}). Seed DEMO permanece en el resto.`,
+      );
+    } finally {
+      setBusyDomain(null);
+    }
+  }
+
+  function handleReset(domain: ExcelDomainId) {
+    setLoadedDomains((prev) => {
+      const next = { ...prev };
+      delete next[domain];
+      const siblingStillLoaded =
+        (domain === "inventario" && next.demanda) ||
+        (domain === "demanda" && next.inventario);
+      setOverrides((prevOv) => {
+        const ov = { ...prevOv };
+        for (const k of EXCEL_DOMAINS[domain].sourceKeys) {
+          if (k === "inventory" && siblingStillLoaded) continue;
+          delete ov[k as keyof IntelSourceData];
+        }
+        return ov;
+      });
+      return next;
+    });
+    setBanner(`Restaurado seed DEMO para «${EXCEL_DOMAINS[domain].label}».`);
+  }
+
+  function domainBars(domains: ExcelDomainId[] | undefined) {
+    if (!domains?.length) return null;
+    return (
+      <div className="intel-excel-stack">
+        {domains.map((d) => (
+          <ExcelSectionActions
+            key={d}
+            domain={d}
+            loaded={Boolean(loadedDomains[d])}
+            busy={busyDomain === d}
+            onLoadedFile={handleLoad}
+            onReset={handleReset}
+          />
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -65,20 +158,18 @@ export function IntelDashboardClient({
         <h1>MiccoMed</h1>
         <p className="hero-copy muted">
           Tablero DEMO de mercados, compras, ventas, márgenes, gastos, rotación,
-          clientes y alertas de reposición. Datos 100% ficticios.
+          clientes y alertas de reposición. Descarga la plantilla Excel de cada
+          sección, cárgala y verifica el refresco; sin archivo se usa el seed DEMO.
         </p>
         <div className="intel-hero__actions">
-          <span className="badge">DEMO seed</span>
+          <span className="badge">
+            {data.loadedFromExcel ? "DEMO + Excel" : "DEMO seed"}
+          </span>
           <span className="muted" style={{ fontSize: "0.9rem" }}>
             {data.periodLabel}
           </span>
-          <button type="button" className="btn secondary" disabled title="Fase 2">
-            Importar Excel
-          </button>
         </div>
-        <p className="muted intel-stub-hint">
-          «Importar Excel» queda como stub para la fase 2 (carga de data real).
-        </p>
+        {banner ? <p className="intel-banner ok">{banner}</p> : null}
       </header>
 
       <nav className="intel-tabs" aria-label="Secciones del tablero">
@@ -98,14 +189,30 @@ export function IntelDashboardClient({
       </nav>
 
       {section === "overview" && <Overview data={data} onJump={goToSection} />}
-      {section === "markets" && <Markets data={data} />}
-      {section === "compras" && <Compras data={data} />}
-      {section === "ventas" && <Ventas data={data} />}
-      {section === "margenes" && <Margenes data={data} />}
-      {section === "gastos" && <Gastos data={data} />}
-      {section === "rotacion" && <Rotacion data={data} />}
-      {section === "clientes" && <Clientes data={data} />}
-      {section === "reposicion" && <Reposicion data={data} />}
+      {section === "markets" && (
+        <Markets data={data} excel={domainBars(SECTION_DOMAINS.markets)} />
+      )}
+      {section === "compras" && (
+        <Compras data={data} excel={domainBars(SECTION_DOMAINS.compras)} />
+      )}
+      {section === "ventas" && (
+        <Ventas data={data} excel={domainBars(SECTION_DOMAINS.ventas)} />
+      )}
+      {section === "margenes" && (
+        <Margenes data={data} excel={domainBars(SECTION_DOMAINS.margenes)} />
+      )}
+      {section === "gastos" && (
+        <Gastos data={data} excel={domainBars(SECTION_DOMAINS.gastos)} />
+      )}
+      {section === "rotacion" && (
+        <Rotacion data={data} excel={domainBars(SECTION_DOMAINS.rotacion)} />
+      )}
+      {section === "clientes" && (
+        <Clientes data={data} excel={domainBars(SECTION_DOMAINS.clientes)} />
+      )}
+      {section === "reposicion" && (
+        <Reposicion data={data} excel={domainBars(SECTION_DOMAINS.reposicion)} />
+      )}
     </div>
   );
 }
@@ -121,7 +228,10 @@ function Overview({
   return (
     <section className="intel-section">
       <h2>Resumen ejecutivo</h2>
-      <p className="muted">KPIs del período DEMO — un vistazo para priorizar acciones.</p>
+      <p className="muted">
+        KPIs del período DEMO — un vistazo para priorizar acciones. Carga Excel
+        en cada sección para sustituir ese dominio.
+      </p>
       <div className="intel-kpi-grid">
         <Kpi label="Ventas MTD" value={usd(k.salesMtd)} />
         <Kpi label="Ventas YTD" value={usd(k.salesYtd)} />
@@ -145,6 +255,9 @@ function Overview({
         <button type="button" className="btn secondary" onClick={() => onJump("clientes")}>
           Ver clientes inactivos
         </button>
+        <button type="button" className="btn secondary" onClick={() => onJump("compras")}>
+          Probar carga Excel (compras)
+        </button>
       </div>
     </section>
   );
@@ -167,11 +280,21 @@ function Kpi({
   );
 }
 
-function Markets({ data }: { data: IntelDashboardSnapshot }) {
+function Markets({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   return (
     <section className="intel-section">
       <h2>Mercados, competencia y precios</h2>
-      <p className="muted">Señales DEMO para priorizar share y pricing B2B.</p>
+      <p className="muted">
+        Señales DEMO para priorizar share y pricing B2B. Plantilla multi-hoja
+        (Mercados · Competidores · Oportunidades), 10 filas c/u.
+      </p>
+      {excel}
 
       <h3>Mercados</h3>
       <table>
@@ -252,11 +375,18 @@ function Markets({ data }: { data: IntelDashboardSnapshot }) {
   );
 }
 
-function Compras({ data }: { data: IntelDashboardSnapshot }) {
+function Compras({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   return (
     <section className="intel-section">
       <h2>Compras</h2>
-      <p className="muted">Órdenes de compra DEMO y tendencia mensual.</p>
+      <p className="muted">Órdenes de compra y tendencia mensual (10 filas en plantilla).</p>
+      {excel}
       <MiniBars points={data.purchasesByMonth} />
       <table>
         <thead>
@@ -286,11 +416,18 @@ function Compras({ data }: { data: IntelDashboardSnapshot }) {
   );
 }
 
-function Ventas({ data }: { data: IntelDashboardSnapshot }) {
+function Ventas({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   return (
     <section className="intel-section">
       <h2>Ventas</h2>
-      <p className="muted">Facturas DEMO y curva mensual.</p>
+      <p className="muted">Facturas y curva mensual (plantilla 10 filas).</p>
+      {excel}
       <MiniBars points={data.salesByMonth} accent />
       <table>
         <thead>
@@ -323,13 +460,21 @@ function Ventas({ data }: { data: IntelDashboardSnapshot }) {
   );
 }
 
-function Margenes({ data }: { data: IntelDashboardSnapshot }) {
+function Margenes({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   return (
     <section className="intel-section">
       <h2>Márgenes</h2>
       <p className="muted">
-        Margen bruto por SKU sobre ventas DEMO (precio − ULC). Piso global DEMO 25%.
+        Margen bruto por SKU. Sin Excel: derivado de ventas (precio − ULC). Con
+        plantilla: 10 filas explícitas. Piso global DEMO 25%.
       </p>
+      {excel}
       <table>
         <thead>
           <tr>
@@ -355,11 +500,18 @@ function Margenes({ data }: { data: IntelDashboardSnapshot }) {
   );
 }
 
-function Gastos({ data }: { data: IntelDashboardSnapshot }) {
+function Gastos({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   return (
     <section className="intel-section">
       <h2>Gastos y nómina</h2>
-      <p className="muted">OpEx y headcount DEMO del período.</p>
+      <p className="muted">OpEx y headcount del período — plantillas separadas (10 filas c/u).</p>
+      {excel}
       <h3>Gastos</h3>
       <table>
         <thead>
@@ -406,13 +558,21 @@ function Gastos({ data }: { data: IntelDashboardSnapshot }) {
   );
 }
 
-function Rotacion({ data }: { data: IntelDashboardSnapshot }) {
+function Rotacion({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   return (
     <section className="intel-section">
       <h2>Rotación de inventario</h2>
       <p className="muted">
-        Turns ≈ COGS anualizado / inventario on-hand (costo). Cobertura usa demanda media.
+        Turns ≈ COGS anualizado / inventario on-hand (costo). Plantilla con
+        demanda mensual d1…dn (10 SKUs).
       </p>
+      {excel}
       <table>
         <thead>
           <tr>
@@ -446,15 +606,22 @@ function Rotacion({ data }: { data: IntelDashboardSnapshot }) {
   );
 }
 
-function Clientes({ data }: { data: IntelDashboardSnapshot }) {
+function Clientes({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   const activos = data.clients.filter((c) => c.status === "activo");
   const inactivos = data.clients.filter((c) => c.status === "inactivo");
   return (
     <section className="intel-section">
       <h2>Clientes</h2>
       <p className="muted">
-        {activos.length} activos · {inactivos.length} inactivos (DEMO).
+        {activos.length} activos · {inactivos.length} inactivos.
       </p>
+      {excel}
       <h3>Activos</h3>
       <table>
         <thead>
@@ -503,16 +670,24 @@ function Clientes({ data }: { data: IntelDashboardSnapshot }) {
   );
 }
 
-function Reposicion({ data }: { data: IntelDashboardSnapshot }) {
+function Reposicion({
+  data,
+  excel,
+}: {
+  data: IntelDashboardSnapshot;
+  excel: ReactNode;
+}) {
   return (
     <section className="intel-section">
       <h2>Alertas de reposición</h2>
       <p className="muted">
-        Regla: con ≥6 meses de demanda histórica, si el on-hand cubre ≤3 meses,
-        sugerir qty = demanda_promedio×3 − stock.
+        Regla: con ≥6 meses de demanda histórica, si el on-hand cubre ≤3 meses
+        (borde exacto incluido), sugerir qty = demanda_promedio×3 − stock.
+        Plantilla demanda.xlsx (10 SKUs).
       </p>
+      {excel}
       {data.replenishment.length === 0 ? (
-        <p className="ok">Sin alertas en el seed DEMO.</p>
+        <p className="ok">Sin alertas con la fuente actual.</p>
       ) : (
         <table>
           <thead>

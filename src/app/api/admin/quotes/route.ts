@@ -55,9 +55,17 @@ export async function POST(request: Request) {
     if (!data.reason || data.authorizedPrice == null || !data.lineId) {
       return json({ error: "reason_line_price_required" }, 400);
     }
+    const owned = await sql<{ id: string }>(
+      `select id from quote_line where id = $1 and quote_id = $2`,
+      [data.lineId, data.quoteId],
+    );
+    if (!owned[0]) return json({ error: "line_not_on_quote" }, 400);
     const costs = await sql<{ ulc: string; floor_price: string }>(
-      `select ulc::text, floor_price::text from quote_line_cost where quote_line_id = $1`,
-      [data.lineId],
+      `select qlc.ulc::text, qlc.floor_price::text
+       from quote_line_cost qlc
+       join quote_line ql on ql.id = qlc.quote_line_id
+       where qlc.quote_line_id = $1 and ql.quote_id = $2`,
+      [data.lineId, data.quoteId],
     );
     await sql(
       `insert into margin_override (
@@ -76,8 +84,8 @@ export async function POST(request: Request) {
     await sql(
       `update quote_line set unit_price = $2, line_status = 'OK',
          line_amount = round(($2::numeric * qty)::numeric, 2)
-       where id = $1`,
-      [data.lineId, data.authorizedPrice],
+       where id = $1 and quote_id = $3`,
+      [data.lineId, data.authorizedPrice, data.quoteId],
     );
     await audit(session.id, "margin_override", "quote", data.quoteId, data.reason);
     const sent = await sendQuote({

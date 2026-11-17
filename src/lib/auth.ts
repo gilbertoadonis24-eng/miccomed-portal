@@ -1,4 +1,5 @@
 import { getIdentity } from "../../cursor/identity";
+import { isBootstrapAdminEmail } from "./bootstrap-allowlist";
 import { sql } from "./db";
 
 export type AppRole = "INTERNAL_ADMIN" | "INTERNAL_STAFF" | "CLIENT_USER";
@@ -62,8 +63,7 @@ export async function resolveSession(request: Request): Promise<SessionUser | Re
   );
   let user = users[0];
 
-  // Sin admins activos (p. ej. prod tras quitar seed DEMO): el primer visor
-  // Cursor verificado (persona) se provisiona como INTERNAL_ADMIN.
+  // Sin admins activos: solo emails en BOOTSTRAP_ADMIN_EMAIL / cursor-app allowlist.
   if (!user || !user.active) {
     const bootstrapped = await bootstrapOwnerAdmin({
       email,
@@ -81,11 +81,15 @@ export async function resolveSession(request: Request): Promise<SessionUser | Re
   }
 
   if (!user || !user.active) {
+    const noActiveAdmin = await hasNoActiveAdmin();
+    const hint = noActiveAdmin
+      ? "Pide al owner configurar BOOTSTRAP_ADMIN_EMAIL (secret) o bootstrapAdminEmails en cursor-app.json."
+      : "El visor Cursor debe estar invitado en app_user (email).";
     return Response.json(
       {
         error: "forbidden",
-        reason: "user_not_provisioned",
-        hint: "El visor Cursor debe estar invitado en app_user (email).",
+        reason: noActiveAdmin ? "bootstrap_admin_required" : "user_not_provisioned",
+        hint,
         email,
       },
       { status: 403, headers: { "cache-control": "private, no-store" } },
@@ -209,23 +213,29 @@ const ALL_STAFF_PERMS: StaffPermission[] = [
   "post_payment",
 ];
 
+async function hasNoActiveAdmin(): Promise<boolean> {
+  const activeAdmins = await sql<{ id: string }>(
+    `select id from app_user
+     where role = 'INTERNAL_ADMIN' and active = true
+     limit 1`,
+  );
+  return !activeAdmins[0];
+}
+
 /**
- * Si no hay ningún INTERNAL_ADMIN activo, crea o reactiva este email como admin.
- * No toca filas DEMO ajenas; solo el email del visor verificado.
+ * Solo si no hay INTERNAL_ADMIN activo Y el email está en la allowlist
+ * (`BOOTSTRAP_ADMIN_EMAIL` y/o `cursor-app.json` → bootstrapAdminEmails).
  */
 export async function bootstrapOwnerAdmin(input: {
   email: string;
   displayName: string;
   existing: AppUserRow | null;
 }): Promise<boolean> {
-  const activeAdmins = await sql<{ id: string }>(
-    `select id from app_user
-     where role = 'INTERNAL_ADMIN' and active = true
-     limit 1`,
-  );
-  if (activeAdmins[0]) return false;
+  if (!(await hasNoActiveAdmin())) return false;
 
   const email = input.email.trim().toLowerCase();
+  if (!isBootstrapAdminEmail(email)) return false;
+
   if (input.existing) {
     await sql(
       `update app_user

@@ -18,10 +18,10 @@ export default async function HomePage() {
         </p>
         {!session && (
           <p className="danger">
-            No hay sesión de portal para este visor Cursor. El primer acceso verificado provisiona un
-            INTERNAL_ADMIN automáticamente si aún no hay admins activos; si ya hay admins, el email
-            debe estar invitado en <code>app_user</code>. En local usa el seed DEMO (p. ej.{" "}
-            <code>admin@miccomed.demo</code>).
+            No hay sesión de portal para este visor Cursor. Si no hay admins activos, pide al owner
+            configurar <code>BOOTSTRAP_ADMIN_EMAIL</code> (secret) con su email de Cursor, o la
+            allowlist <code>bootstrapAdminEmails</code> en <code>cursor-app.json</code>. En local
+            usa el seed DEMO (p. ej. <code>admin@miccomed.demo</code>).
           </p>
         )}
         {session?.plane === "internal" && (
